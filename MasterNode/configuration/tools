@@ -1,0 +1,5 @@
+assignIDs - organismsFolder,list
+cdHit     - organismsFolder,outputFolder
+createDB  - inputFolder,outputFolder
+blastvsDB - inputFolder(pathways),inputDB,outputFolder
+

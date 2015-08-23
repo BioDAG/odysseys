@@ -1,6 +1,5 @@
-Odysseus: a versatile high-performance framework for enabling bioinformatics workflows on
-hybrid cloud environments
-================
+Odysseus: a versatile high-performance framework for enabling bioinformatics workflows on hybrid cloud environments
+
 
 Odysseus is a high performance hybrid cloud framework for component based bioinformatics workflows that aims to optimize performance,
 resource allocation and load distribution across heterogeneous computational resources, i.e. comprising of both cloud-based solutions
