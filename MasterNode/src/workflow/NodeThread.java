@@ -40,6 +40,7 @@ import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -59,14 +60,16 @@ public class NodeThread extends Thread {
     String bundle = "1";
     String cdhit = "0";
     String bypassit = "1";
+    ArrayList<Component> componentsTobeExecuted;
 
-    public NodeThread(int id, Node node, String workingDir, String chunkSize) throws IOException, Exception {
+    public NodeThread(int id, Node node, String workingDir, String chunkSize, ArrayList<Component> componentsTobeExecuted) throws IOException, Exception {
         
         this.id = id;
         this.node = node;
         this.workingDir = workingDir;
         jobSocket = new ServerSocket(Integer.parseInt(node.localJobPort));
         this.chunkSize=chunkSize;
+        this.componentsTobeExecuted=componentsTobeExecuted;
 
     }
 
@@ -173,7 +176,6 @@ public class NodeThread extends Thread {
 //            System.out.println("FATAL ERROR " + response);
 //        }
         System.out.println("NODE " + node.name + " " + response);
-
     }
 
     @Override

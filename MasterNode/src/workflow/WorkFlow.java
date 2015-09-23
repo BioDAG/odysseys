@@ -1,35 +1,35 @@
 /*
-The MIT License (MIT)
+ The MIT License (MIT)
 
-Copyright (c) 2014 BioDAG
+ Copyright (c) 2014 BioDAG
 
-Odysseus: a versatile high-performance framework for enabling bioinformatics workflows on
-hybrid cloud environments
+ Odysseus: a versatile high-performance framework for enabling bioinformatics workflows on
+ hybrid cloud environments
 
-Athanassios M. Kintsakis akintsakis@issel.ee.auth.gr
-Fotis E. Psomopoulos     fpsom@issel.ee.auth.gr
-Perciles A. Mitkas       mitkas@auth.gr
+ Athanassios M. Kintsakis akintsakis@issel.ee.auth.gr
+ Fotis E. Psomopoulos     fpsom@issel.ee.auth.gr
+ Perciles A. Mitkas       mitkas@auth.gr
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
 
-Author: Athanassios Kintsakis
-contact: akintsakis@issel.ee.auth.gr
+ Author: Athanassios Kintsakis
+ contact: akintsakis@issel.ee.auth.gr
  */
 package workflow;
 
@@ -53,7 +53,6 @@ import net.neoremind.sshxcute.core.ConnBean;
 import net.neoremind.sshxcute.core.SSHExec;
 import net.neoremind.sshxcute.task.CustomTask;
 import net.neoremind.sshxcute.task.impl.ExecCommand;
-
 
 public class WorkFlow {
 
@@ -835,9 +834,6 @@ public class WorkFlow {
 
     public static void scheduler(ArrayList<Node> nodes, String chunkSize, String descriptionAddon) throws InterruptedException, IOException, Exception {
 
-        //String descriptionAddon = "";
-        //descriptionAddon = "COUNTDOWN_ALL_NewThreads_SchSize=100_experimentTBD";
-        //String workingDir = (new Date()).toString() + "_" + descriptionAddon + "_experimentTBD";
         String workingDir = (new Date()).toString() + "_" + descriptionAddon;// + "_experimentTBD";
         workingDir = workingDir.replaceAll(" ", "-");
         workingDir = workingDir.replaceAll(":", "");
@@ -857,23 +853,22 @@ public class WorkFlow {
                     NodeThreads.add(t);
                 }
             }
-
             //t.start();
         }
         for (int i = 0; i < NodeThreads.size(); i++) {
-            //if ((nodes.get(i).enabled.equals("enabled"))) {
-            //if (i == 1) {
             NodeThreads.get(i).start();
-            //}
-            //}
-
         }
         for (int i = 0; i < NodeThreads.size(); i++) {
-            //if ((nodes.get(i).enabled.equals("enabled"))) {
-            // if (i == 1) {
             NodeThreads.get(i).join();
-            //}
-            //}
+        }
+
+    }
+
+    public static void buildNodeComponentExecutionList(ArrayList<Node> nodes,ArrayList<Component> componentsGeneral) {
+        
+        for(int i=0;i<nodes.size();i++)
+        {
+            
         }
 
     }
@@ -892,17 +887,9 @@ public class WorkFlow {
 
         ArrayList<Node> nodes = new ArrayList<Node>();
         //nodes.add(n2);
-        String masterIp = "46.12.120.197";
-        double okeanosScore = 89003.8;
-        Node n5 = new Node("enabled", "BW1", 5, "snf-658570.vm.okeanos.grnet.gr", "", "user", "aWT8fDEtST", okeanosScore, masterIp, "30433", "30431", "8");
-        Node n4 = new Node("enabled", "BW2", 4, "snf-658569.vm.okeanos.grnet.gr", "", "user", "t5OLkyGPuR", okeanosScore, masterIp, "30432", "30431", "8");
-
-        Node n3 = new Node("enabled", "Work", 3, "155.207.19.45", "", "thanos", "323143", 130549.8, masterIp, "30434", "30431", "8");
-        Node n2 = new Node("enabled", "Home", 2, "127.0.0.1", "", "thanos", "323143", 137856.4, "127.0.0.1", "30431", "30430", "8"); //79.103.149.102
-        n2.ismaster = true;
-        Node n1 = new Node("enabled", "Aphrodite", 1, "155.207.19.43", "", "thanos", "1212", 180410.9, masterIp, "30444", "30431", "12");
-
-        Node n0 = new Node("enabled", "Certh6", 0, "160.40.71.6", "localhost", "akintsakis", "m318297k", 241824.3, masterIp, "30435", "30491", "24");  //30292 score, 24 threads
+    
+     
+     
 
         nodes.add(n0);
         nodes.add(n1);
@@ -911,15 +898,7 @@ public class WorkFlow {
         nodes.add(n4);
         nodes.add(n5);
 
-        //*/
-        Node n6 = new Node("enabled", "HC1", 6, "snf-658613.vm.okeanos.grnet.gr", "", "user", "s0gS3ZPCsi", okeanosScore, masterIp, "30436", "30431", "8");
-        Node n7 = new Node("enabled", "HC2", 7, "snf-657775.vm.okeanos.grnet.gr", "", "user", "P8sfHB3WBd", okeanosScore, masterIp, "30437", "30431", "8");
-        Node n8 = new Node("enabled", "HC3", 8, "snf-657776.vm.okeanos.grnet.gr", "", "user", "jFHU3L3Zmd", okeanosScore, masterIp, "30438", "30431", "8");
-        Node n9 = new Node("enabled", "HC4", 9, "snf-657777.vm.okeanos.grnet.gr", "", "user", "IsMripQa70", okeanosScore, masterIp, "30439", "30431", "8");
-        Node n10 = new Node("enabled", "HC5", 10, "snf-657778.vm.okeanos.grnet.gr", "", "user", "Wn3D6zW3QN", okeanosScore, masterIp, "30440", "30431", "8");
-        Node n11 = new Node("enabled", "HC6", 11, "snf-657779.vm.okeanos.grnet.gr", "", "user", "Ruq6AWScQH", okeanosScore, masterIp, "30441", "30431", "8");
-        Node n12 = new Node("enabled", "HC7", 12, "snf-657780.vm.okeanos.grnet.gr", "", "user", "NNW4pRt64y", okeanosScore, masterIp, "30442", "30431", "8");
-        Node n13 = new Node("enabled", "HC8", 13, "snf-657781.vm.okeanos.grnet.gr", "", "user", "P7RO9YD7qw", okeanosScore, masterIp, "30443", "30431", "8");
+
 
         nodes.add(n6);
         nodes.add(n7);
