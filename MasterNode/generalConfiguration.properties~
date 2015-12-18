@@ -1,0 +1,18 @@
+# These are the default properties
+#File paths
+kamakiAuthenticationFilePath=/home/thanos/.kamakirc
+initCodeFolderPath=/home/thanos/Dropbox/Code/odysseys/MasterNode/initCode
+initDataFolderPath=/home/thanos/Dropbox/Code/odysseys/MasterNode/initData
+nodeSpecificData=/home/thanos/Dropbox/Code/odysseys/MasterNode/nodeSpecificData
+nodesFile=/home/thanos/Desktop/nodes1
+OUnamesAndSizesPath=/home/thanos/Dropbox/Code/odysseys/variousInputFiles/cyanPithosFileListOrderedScore
+
+#Workflow Parameters
+chunkSize=500
+descriptionAddon=xxdeleteOnNextRunOdysseus
+datasetInfo=cyanobacteriaAVA
+activeMonitoring=true
+useLocalQuery=false
+profileMode=1
+saveNodeLogs=true
+

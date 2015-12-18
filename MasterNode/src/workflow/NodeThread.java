@@ -1,35 +1,35 @@
 /*
-The MIT License (MIT)
+ The MIT License (MIT)
 
-Copyright (c) 2014 BioDAG
+ Copyright (c) 2014 BioDAG
 
-Odysseus: a versatile high-performance framework for enabling bioinformatics workflows on
-hybrid cloud environments
+ Odysseus: a versatile high-performance framework for enabling bioinformatics workflows on
+ hybrid cloud environments
 
-Athanassios M. Kintsakis akintsakis@issel.ee.auth.gr
-Fotis E. Psomopoulos     fpsom@issel.ee.auth.gr
-Perciles A. Mitkas       mitkas@auth.gr
+ Athanassios M. Kintsakis akintsakis@issel.ee.auth.gr
+ Fotis E. Psomopoulos     fpsom@issel.ee.auth.gr
+ Perciles A. Mitkas       mitkas@auth.gr
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
 
-Author: Athanassios Kintsakis
-contact: akintsakis@issel.ee.auth.gr
+ Author: Athanassios Kintsakis
+ contact: akintsakis@issel.ee.auth.gr
  */
 package workflow;
 
@@ -45,32 +45,39 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-
 public class NodeThread extends Thread {
 
     Node node;
     ServerSocket jobSocket;
-    int id;    
+    int id;
     String workingDir;
-    //String rootPath;
     String chunkSize;// = "100";
     String profileMode = "1";
-    String saveResults = "1";
-    String dataset = "cyanobacteria all vs all";
-    String bundle = "1";
-    String cdhit = "0";
-    String bypassit = "1";
+    Boolean saveNodeLogs = false;
+    String datasetInfo = "";
+    Boolean activeMonitoring = false;
+    //String cdhit = "0";
+    Boolean useLocalQuery = false;
     ArrayList<Component> componentsTobeExecuted;
 
     public NodeThread(int id, Node node, String workingDir, String chunkSize, ArrayList<Component> componentsTobeExecuted) throws IOException, Exception {
-        
         this.id = id;
         this.node = node;
         this.workingDir = workingDir;
         jobSocket = new ServerSocket(Integer.parseInt(node.localJobPort));
-        this.chunkSize=chunkSize;
-        this.componentsTobeExecuted=componentsTobeExecuted;
-
+        this.chunkSize = chunkSize;
+        this.componentsTobeExecuted = componentsTobeExecuted;
+        if (WorkFlow.generalConfiguration.getProperty("activeMonitoring").toLowerCase().equals("true")) {
+            activeMonitoring = true;
+        }
+        if (WorkFlow.generalConfiguration.getProperty("useLocalQuery").toLowerCase().equals("true")) {
+            useLocalQuery = true;
+        }
+        if (WorkFlow.generalConfiguration.getProperty("saveNodeLogs").toLowerCase().equals("true")) {
+            saveNodeLogs = true;
+        }
+        datasetInfo = WorkFlow.generalConfiguration.getProperty("datasetInfo");
+        profileMode = WorkFlow.generalConfiguration.getProperty("profileMode");        
     }
 
     public static void talker(String message, String serverName, String portString) {
@@ -95,6 +102,122 @@ public class NodeThread extends Thread {
             e.printStackTrace();
         }
 
+    }
+
+    public ArrayList<String> constructWorkflowCommands(String rootPath) throws InterruptedException {
+        ArrayList<String> commands = new ArrayList<String>();
+        String currentCommand;
+        //currentCommand = "chunk size " + chunkSize + " profile mode " + profileMode + " dataset " + dataset;
+        //commands.add(currentCommand);
+        //sendIt(currentCommand, node.ip, node.remoteJobPort);
+
+        //
+        currentCommand = "bash;" + rootPath + "initCode/kamakiCodeDownload.sh;" + rootPath;
+        commands.add(currentCommand);
+        //sendIt(currentCommand, node.ip, node.remoteJobPort);
+        //
+
+        currentCommand = "bash;" + rootPath + "code/workspaceInit.sh;" + rootPath;
+        commands.add(currentCommand);
+        //sendIt(currentCommand, node.ip, node.remoteJobPort);
+
+        //command = "bash;" + rootPath + "code/compileTools.sh;" + rootPath + "code/cd-hit/";
+        //sendIt(command, node.ip, node.remoteJobPort);
+        currentCommand = "bash;" + rootPath + "code/kamakiDownloader.sh;" + rootPath + id + ".organisms;" + rootPath + "./organisms";
+        commands.add(currentCommand);
+        //sendIt(currentCommand, node.ip, node.remoteJobPort);
+
+        currentCommand = "java;-jar;" + rootPath + "/code/organismIdAssigner.jar;" + rootPath + "/organisms/;" + rootPath + "/list.csv;" + rootPath + "/organismsWithID/";
+        commands.add(currentCommand);
+        //sendIt(currentCommand, node.ip, node.remoteJobPort);
+
+        if (useLocalQuery) {
+            currentCommand = "bash;" + rootPath + "code/bypassPathways.sh;" + rootPath;
+            commands.add(currentCommand);
+            //sendIt(currentCommand, node.ip, node.remoteJobPort);
+
+        } else {
+            TimeUnit.SECONDS.sleep(id * 20);
+            currentCommand = "bash;" + rootPath + "code/downloadPathways.sh;" + rootPath;
+            commands.add(currentCommand);
+            //sendIt(currentCommand, node.ip, node.remoteJobPort);
+        }
+
+        long t1 = System.currentTimeMillis();
+
+        if (profileMode.equals("1")) {
+//            if (cdhit.equals("1")) {
+//                currentCommand = "java;-jar;" + rootPath + "code/localDistributer.jar;" + rootPath + "organismsWithID;" + rootPath + "HITorganismsWithID/;" + rootPath + "code/cd-hit/cd-hit -i inFile -o outFile -c 1.00 -n 5 -g 1;" + node.threads;//"8";
+//                sendIt(currentCommand, node.ip, node.remoteJobPort);
+//
+//                currentCommand = "bash;" + rootPath + "code/buildDB.sh;" + rootPath;
+//                sendIt(currentCommand, node.ip, node.remoteJobPort);
+//            } else {
+            currentCommand = "bash;" + rootPath + "code/buildDBNoHit.sh;" + rootPath;
+            commands.add(currentCommand);
+            //sendIt(currentCommand, node.ip, node.remoteJobPort);
+            //  }
+
+        } else if (profileMode.equals("2")) {
+            currentCommand = "bash;" + rootPath + "code/buildDBAVA.sh;" + rootPath;
+            commands.add(currentCommand);
+            //sendIt(currentCommand, node.ip, node.remoteJobPort);
+        }
+
+        currentCommand = "java;-jar;" + rootPath + "code/fastaSplitter.jar;" + rootPath + "allPathways.fasta;" + rootPath + "chunks/;" + chunkSize;
+        commands.add(currentCommand);
+        //sendIt(currentCommand, node.ip, node.remoteJobPort);
+
+        //command = "java;-jar;" + rootPath + "code/localDistributerNC.jar;" + rootPath + "chunks/;" + rootPath + "blastOut/;" + "/opt/ncbi-blast-2.2.30+/bin/blastp -query inFile -db " + rootPath + "DB/DB" + " -evalue 0.000001 -outfmt 6 -out outFile.blastp;" + "8";
+        //sendIt(command, node.ip, node.remoteJobPort);
+        //    if (noActiveMonitoring.equals("0")) {
+        currentCommand = "java;-jar;" + rootPath + "code/blastProfDistributer.jar;" + rootPath + "chunks/;" + rootPath + "blastOut/;" + "/opt/ncbi-blast-2.2.30+/bin/blastp -query inFile -db " + rootPath + "DB/DB" + " -evalue 0.000001 -outfmt 6 -out outFile.blastp;" + rootPath + "TreeOrder.txt;" + node.threads + ";" + profileMode;
+        commands.add(currentCommand);
+        //sendIt(currentCommand, node.ip, node.remoteJobPort);
+
+        if (profileMode.equals("1")) {
+            currentCommand = "bash;" + rootPath + "code/catNodeScript.sh;" + rootPath + "blastOut/;" + String.valueOf(node.id);
+            commands.add(currentCommand);
+            //sendIt(currentCommand, node.ip, node.remoteJobPort);
+        } else if (profileMode.equals("2")) {
+            currentCommand = "bash;" + rootPath + "code/catAVA.sh;" + rootPath + "blastOut/;" + String.valueOf(node.id);
+            commands.add(currentCommand);
+            //sendIt(currentCommand, node.ip, node.remoteJobPort);
+        }
+        long t2 = System.currentTimeMillis();
+        //System.out.println(node.ip + " finished @ " + (t2 - t1) + " seconds");
+
+        currentCommand = "bash;" + rootPath + "code/killLogers.sh";
+        commands.add(currentCommand);
+        //sendIt(currentCommand, node.ip, node.remoteJobPort);
+
+        if (saveNodeLogs) {
+            currentCommand = "bash;" + rootPath + "code/tarUploadonlyLogs.sh;" + rootPath + ";" + id + ".tar.gz;" + workingDir;
+            commands.add(currentCommand);
+            //sendIt(currentCommand, node.ip, node.remoteJobPort);
+        } else {
+            currentCommand = "terminate";
+            commands.add(currentCommand);
+            //sendIt(currentCommand, node.ip, node.remoteJobPort);
+        }
+//        } else {
+//            currentCommand = "java;-jar;" + rootPath + "code/blastProfDistributer.jar;" + rootPath + "chunks/;" + rootPath + "blastOut/;" + "/opt/ncbi-blast-2.2.30+/bin/blastp -query inFile -db " + rootPath + "DB/DB" + " -evalue 0.000001 -outfmt 6 -out outFile.blastp;" + rootPath + "TreeOrder.txt;" + node.threads + ";" + profileMode + "!";
+//
+//            if (profileMode.equals("1")) {
+//                currentCommand = currentCommand + "bash;" + rootPath + "code/catNodeScript.sh;" + rootPath + "blastOut/;" + String.valueOf(node.id) + "!";
+//            } else {
+//                currentCommand = currentCommand + "bash;" + rootPath + "code/catAVA.sh;" + rootPath + "blastOut/;" + String.valueOf(node.id) + "!";
+//            }
+//            currentCommand = currentCommand + "bash;" + rootPath + "code/killLogers.sh" + "!";
+//            if (saveResults.equals("1")) {
+//                currentCommand = currentCommand + "bash;" + rootPath + "code/tarUploadonlyLogs.sh;" + rootPath + ";" + id + ".tar.gz;" + workingDir;
+//            } else {
+//                currentCommand = currentCommand + "terminate";
+//            }
+//            sendIt(currentCommand, node.ip, node.remoteJobPort);
+//
+//        }
+        return commands;
     }
 
     public String waitForCommand() {
@@ -129,41 +252,6 @@ public class NodeThread extends Thread {
 
     }
 
-//    public void initializeNode(Node node) throws Exception {
-//        String rootPath = "/home/" + node.username + "/" + workingDir + "/";
-//            //override
-//            //rootPath="/home/" + node.username + "/" + "Thu-Apr-09-002155-EEST-2015" + "/";
-//            // command = "bash;" + rootPath + "code/compileTools.sh;" + rootPath + "code/cd-hit/";
-//            ConnBean cb = new ConnBean(node.ip, node.username, node.password);
-//            SSHExec ssh = SSHExec.getInstance(cb);
-//
-//            ssh.connect();
-//            CustomTask sampleTask;
-//            ssh.uploadAllDataToServer("/home/thanos/Dropbox/NetBeansProjects/genome-profiling/WorkFlow/initCode", rootPath);
-//            ssh.uploadSingleDataToServer("./list.csv", rootPath);
-//            ssh.uploadSingleDataToServer("./" + id + ".organisms", rootPath);
-//            ssh.uploadSingleDataToServer("./TreeOrder.txt", rootPath);
-//            ssh.uploadSingleDataToServer("/home/thanos/.kamakirc", ("/home/" + node.username + "/"));
-//
-//
-//            sampleTask = new ExecCommand("cd " + rootPath, "mkdir remote");//,"sshfs thanos@"+node.masterAddress+":/home/thanos/Master/"+node.id+" "+rootPath+"remote/ -o nonempty");
-//            ssh.exec(sampleTask);
-//            if (node.ismaster == true) {
-//                sampleTask = new ExecCommand("cd " + rootPath, "mkdir master");//,"sshfs thanos@"+node.masterAddress+":/home/thanos/Master/"+node.id+" "+rootPath+"remote/ -o nonempty");
-//                ssh.exec(sampleTask);
-//            }
-//            sampleTask = new ExecCommand("screen -S clientDaemon -d -m java -jar " + rootPath + "initCode/Client.jar " + node.masterAddress + " " + node.localJobPort + " " + node.remoteJobPort,"screen -S loadLoging -d -m bash " + rootPath + "initCode/loadLogScript.sh","screen -S memLoging -d -m bash " + rootPath + "initCode/memLogScript.sh");
-//            ssh.exec(sampleTask);
-//            
-////            sampleTask = new ExecCommand("screen -S loadLoging -d -m bash " + rootPath + "initCode/loadLogScript.sh");
-////            ssh.exec(sampleTask);
-////            
-////            sampleTask = new ExecCommand("screen -S memLoging -d -m bash " + rootPath + "initCode/memLogScript.sh");
-////            ssh.exec(sampleTask);
-//            
-//            ssh.disconnect();
-//        System.out.println("-------------------------------------------Node "+node.name+" initialized");
-//    }
     public void sendIt(String command, String ip, String port) {
         if (!node.tunnelIP.equals("")) {
             talker(command, node.tunnelIP, port);
@@ -176,6 +264,17 @@ public class NodeThread extends Thread {
 //            System.out.println("FATAL ERROR " + response);
 //        }
         System.out.println("NODE " + node.name + " " + response);
+    }
+
+    public String buildCommandBundle(ArrayList<String> commands) {
+        String bundle = "";
+        for (int i = 0; i < commands.size(); i++) {
+            bundle = bundle + commands.get(i) + "<cmd>";
+        }
+        //System.out.println(" PRINTING BUNDLE = "+bundle);
+        // String[] tmp = bundle.split("<cmd>");
+        //System.out.println("bundle [0] "+tmp[0]);
+        return bundle;
     }
 
     @Override
@@ -197,158 +296,20 @@ public class NodeThread extends Thread {
             //create blastdb
             //start blasts
 
-            String command;
-            String response;
+//            String command;
+//            String response;
             String rootPath = "/home/" + node.username + "/" + workingDir + "/";
-            //override
-            //rootPath="/home/" + node.username + "/" + "Thu-Apr-09-002155-EEST-2015" + "/";
-            // command = "bash;" + rootPath + "code/compileTools.sh;" + rootPath + "code/cd-hit/";
-//            ConnBean cb = new ConnBean(node.ip, node.username, node.password);
-//            SSHExec ssh = SSHExec.getInstance(cb);
-//
-//            ssh.connect();
-//            CustomTask sampleTask;
-//            ssh.uploadAllDataToServer("/home/thanos/Dropbox/NetBeansProjects/genome-profiling/WorkFlow/initCode", rootPath);
-//            ssh.uploadSingleDataToServer("./list.csv", rootPath);
-//            ssh.uploadSingleDataToServer("./" + id + ".organisms", rootPath);
-//            ssh.uploadSingleDataToServer("./TreeOrder.txt", rootPath);
-//            ssh.uploadSingleDataToServer("/home/thanos/.kamakirc", ("/home/" + node.username + "/"));
-//
-//
-//            sampleTask = new ExecCommand("cd " + rootPath, "mkdir remote");//,"sshfs thanos@"+node.masterAddress+":/home/thanos/Master/"+node.id+" "+rootPath+"remote/ -o nonempty");
-//            ssh.exec(sampleTask);
-//            if (node.ismaster == true) {
-//                sampleTask = new ExecCommand("cd " + rootPath, "mkdir master");//,"sshfs thanos@"+node.masterAddress+":/home/thanos/Master/"+node.id+" "+rootPath+"remote/ -o nonempty");
-//                ssh.exec(sampleTask);
-//            }
-//              sampleTask = new ExecCommand("rm ~/load.log","rm ~/log","rm ~/mem.log","screen -S clientDaemon -d -m java -jar " + rootPath + "initCode/Client.jar " + node.masterAddress + " " + node.localJobPort + " " + node.remoteJobPort,"screen -S loadLoging -d -m bash " + rootPath + "initCode/loadLogScript.sh","screen -S memLoging -d -m bash " + rootPath + "initCode/memLogScript.sh");
-//            ssh.exec(sampleTask);
-//            
-//            ssh.disconnect();
+            ArrayList<String> commands = constructWorkflowCommands(rootPath);
 
-////            
-////            //initialize workspace
-////
-            //initializeNode(node);
-////            //
-////            
-////            //download kamaki code
-            //send INFO
-            command = "chunk size " + chunkSize + " profile mode " + profileMode + " dataset " + dataset;
-            sendIt(command, node.ip, node.remoteJobPort);
-
-            //
-            command = "bash;" + rootPath + "initCode/kamakiCodeDownload.sh;" + rootPath;
-            sendIt(command, node.ip, node.remoteJobPort);
-            //
-
-            command = "bash;" + rootPath + "code/workspaceInit.sh;" + rootPath;
-            sendIt(command, node.ip, node.remoteJobPort);
-
-            command = "bash;" + rootPath + "code/compileTools.sh;" + rootPath + "code/cd-hit/";
-            sendIt(command, node.ip, node.remoteJobPort);
-
-            command = "bash;" + rootPath + "code/kamakiDownloader.sh;" + rootPath + id + ".organisms;" + rootPath + "./organisms";
-            sendIt(command, node.ip, node.remoteJobPort);
-
-            command = "java;-jar;" + rootPath + "/code/organismIdAssigner.jar;" + rootPath + "/organisms/;" + rootPath + "/list.csv;" + rootPath + "/organismsWithID/";
-            sendIt(command, node.ip, node.remoteJobPort);
-
-            if (bypassit.equals("1")) {
-                command = "bash;" + rootPath + "code/bypassPathways.sh;" + rootPath;
-                sendIt(command, node.ip, node.remoteJobPort);
-
-            } else {
-                TimeUnit.SECONDS.sleep(id * 20);
-                command = "bash;" + rootPath + "code/downloadPathways.sh;" + rootPath;
-                sendIt(command, node.ip, node.remoteJobPort);
-            }
-
-            long t1 = System.currentTimeMillis();
-
-            if (profileMode.equals("1")) {
-                if (cdhit.equals("1")) {
-                    command = "java;-jar;" + rootPath + "code/localDistributer.jar;" + rootPath + "organismsWithID;" + rootPath + "HITorganismsWithID/;" + rootPath + "code/cd-hit/cd-hit -i inFile -o outFile -c 1.00 -n 5 -g 1;" + node.threads;//"8";
-                    sendIt(command, node.ip, node.remoteJobPort);
-
-                    command = "bash;" + rootPath + "code/buildDB.sh;" + rootPath;
-                    sendIt(command, node.ip, node.remoteJobPort);
-                } else {
-                    command = "bash;" + rootPath + "code/buildDBNoHit.sh;" + rootPath;
-                    sendIt(command, node.ip, node.remoteJobPort);
-                }
-
-            } else if (profileMode.equals("2")) {
-                command = "bash;" + rootPath + "code/buildDBAVA.sh;" + rootPath;
-                sendIt(command, node.ip, node.remoteJobPort);
-            }
-
-            command = "java;-jar;" + rootPath + "code/fastaSplitter.jar;" + rootPath + "allPathways.fasta;" + rootPath + "chunks/;" + chunkSize;
-            sendIt(command, node.ip, node.remoteJobPort);
-
-            //command = "java;-jar;" + rootPath + "code/localDistributerNC.jar;" + rootPath + "chunks/;" + rootPath + "blastOut/;" + "/opt/ncbi-blast-2.2.30+/bin/blastp -query inFile -db " + rootPath + "DB/DB" + " -evalue 0.000001 -outfmt 6 -out outFile.blastp;" + "8";
-            //sendIt(command, node.ip, node.remoteJobPort);
-            if (bundle.equals("0")) {
-                command = "java;-jar;" + rootPath + "code/blastProfDistributer.jar;" + rootPath + "chunks/;" + rootPath + "blastOut/;" + "/opt/ncbi-blast-2.2.30+/bin/blastp -query inFile -db " + rootPath + "DB/DB" + " -evalue 0.000001 -outfmt 6 -out outFile.blastp;" + rootPath + "TreeOrder.txt;" + node.threads + ";" + profileMode;
-                sendIt(command, node.ip, node.remoteJobPort);
-
-                if (profileMode.equals("1")) {
-                    command = "bash;" + rootPath + "code/catNodeScript.sh;" + rootPath + "blastOut/;" + String.valueOf(node.id);
-                    sendIt(command, node.ip, node.remoteJobPort);
-                } else if (profileMode.equals("2")) {
-                    command = "bash;" + rootPath + "code/catAVA.sh;" + rootPath + "blastOut/;" + String.valueOf(node.id);
-                    sendIt(command, node.ip, node.remoteJobPort);
-                }
-                long t2 = System.currentTimeMillis();
-                System.out.println(node.ip + " finished @ " + (t2 - t1) + " seconds");
-
-                command = "bash;" + rootPath + "code/killLogers.sh";
-                sendIt(command, node.ip, node.remoteJobPort);
-
-                if (saveResults.equals("1")) {
-                    command = "bash;" + rootPath + "code/tarUploadonlyLogs.sh;" + rootPath + ";" + id + ".tar.gz;" + workingDir;
-                    sendIt(command, node.ip, node.remoteJobPort);
-                } else {
-                    command = "terminate";
-                    sendIt(command, node.ip, node.remoteJobPort);
+            if (activeMonitoring) {
+                for (int i = 0; i < commands.size(); i++) {
+                    sendIt(commands.get(i), node.ip, node.remoteJobPort);
                 }
             } else {
-                command = "java;-jar;" + rootPath + "code/blastProfDistributer.jar;" + rootPath + "chunks/;" + rootPath + "blastOut/;" + "/opt/ncbi-blast-2.2.30+/bin/blastp -query inFile -db " + rootPath + "DB/DB" + " -evalue 0.000001 -outfmt 6 -out outFile.blastp;" + rootPath + "TreeOrder.txt;" + node.threads + ";" + profileMode + "!";
-
-                if (profileMode.equals("1")) {
-                    command = command + "bash;" + rootPath + "code/catNodeScript.sh;" + rootPath + "blastOut/;" + String.valueOf(node.id) + "!";
-                } else {
-                    command = command + "bash;" + rootPath + "code/catAVA.sh;" + rootPath + "blastOut/;" + String.valueOf(node.id) + "!";
-                }
-                command = command + "bash;" + rootPath + "code/killLogers.sh" + "!";
-                if (saveResults.equals("1")) {
-                    command = command + "bash;" + rootPath + "code/tarUploadonlyLogs.sh;" + rootPath + ";" + id + ".tar.gz;" + workingDir;
-                } else {
-                    command = command + "terminate";
-                }
-                sendIt(command, node.ip, node.remoteJobPort);
-
+                String commandBundle = buildCommandBundle(commands);
+                System.out.println(commandBundle);
+                sendIt(commandBundle, node.ip, node.remoteJobPort);
             }
-
-            //sampleTask = new ExecCommand("fusermount -u /home/ ./remote/");
-//            
-//            arg1="\""+rootPath+"allPathways.fasta"+"\" ";
-//            arg2="\""+rootPath+"chuncks/"+"\" ";
-//            arg3="\""+"2"+"\"";
-//            sampleTask = new ExecCommand("cd "+rootPath,"mkdir chuncks","java -jar "+rootPath+"code/fastaSplitter.jar "+ arg1+arg2+arg3);
-//            ssh.exec(sampleTask);
-//            //works up to chunks
-//            arg4="\""+"8"+"\"";            
-//            arg3="\""+"blastp -query inFile -db "+rootPath+"DB/DB" +" -evalue 0.000001 -outfmt 6 -out outFile.blastp"+"\" ";
-//            arg2="\""+rootPath+"blastOut/"+"\" ";
-//            arg1="\""+rootPath+"chuncks/"+"\" ";
-//            sampleTask = new ExecCommand("cd "+rootPath,"mkdir blastOut","screen -S test -d -m java -jar "+rootPath+"code/localDistributer.jar "+arg1+arg2+arg3+arg4);
-//            ssh.exec(sampleTask);
-//        
-//            //java -jar ./code/localDistributer.jar "/home/thanos/workDirectory/chuncks/" "/home/thanos/workDirectory/blastOut/" "blastp -query inFile -db /home/thanos/workDirectory/DB/DB -evalue 0.000001 -outfmt 6 -out outFile.blastp" "8"
-            //ssh.disconnect();
-            //} catch (TaskExecFailException ex) {
-            //  Logger.getLogger(NodeThread.class.getName()).log(Level.SEVERE, null, ex);
         } catch (Exception ex) {
             Logger.getLogger(NodeThread.class.getName()).log(Level.SEVERE, null, ex);
         }

@@ -36,6 +36,7 @@ package workflow;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -48,6 +49,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import net.neoremind.sshxcute.core.ConnBean;
 import net.neoremind.sshxcute.core.SSHExec;
@@ -56,103 +58,29 @@ import net.neoremind.sshxcute.task.impl.ExecCommand;
 
 public class WorkFlow {
 
-    public static void executeBashScript(String[] cmd) {
-
-        StringBuffer output = new StringBuffer();
-
-        Process p;
-        //ProcessBuilder pb;
-        try {
-            //p = Runtime.getRuntime().exec(path + " " + mainPath + " 1>/dev/null");
-            System.out.println("execturing " + cmd);
-
-            //p = Runtime.getRuntime().exec(new String[]{"java","-jar", "/home/thanos/Mon-Apr-06-213156-EEST-2015/code/localDistributer.jar","1 6","2","3","4"});//+ " 1>/dev/null");
-            p = Runtime.getRuntime().exec(cmd);
-// pb = new ProcessBuilder("/bin/bash","/home/thanos/Fotis/plantsProject/cdHIT_makeBlastDB.sh /home/thanos/Fotis/plantsProject/ 1>/dev/null 2>/dev/null");
-            //p = Runtime.getRuntime().exec("/home/thanos/Fotis/plantsProject/cdHIT_makeBlastDB.sh /home/thanos/Fotis/plantsProject/ 1>/dev/null 2>/dev/null");
-            //p.waitFor();
-            //Process p=pb.start();
-
-            p.waitFor();
-            BufferedReader reader
-                    = new BufferedReader(new InputStreamReader(p.getInputStream())); //p.getInputStream()
-
-            String line = "";
-            while ((line = reader.readLine()) != null) {
-                output.append(line + "\n");
-            }
-            p.destroy();
-            //System.out.println(output.toString());
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.out.println("exception " + e);
-        }
-        System.out.println("before");
-        System.out.println(output.toString());
-        //return output.toString();
-        // return "nothing";
-
-    }
-
-    public static void fastaSplitter(String filePath, String outPath, int splitSize) throws IOException {
-
-        List<String> lines = Files.readAllLines(Paths.get(filePath), StandardCharsets.UTF_8);
-        int count = 1;
-        int rsplit = splitSize;
-        int logic = 0;
-
-        BufferedWriter wr1 = new BufferedWriter(new FileWriter(new File(outPath + "chunk_1.fa")));;
-        for (int i = 0; i < lines.size(); i++) {
-            if (lines.get(i).contains(">")) {
-                //System.out.println("contains");
-                if (logic == 1) {
-                    String fileOutPath = outPath + "chunk_" + Integer.toString(count) + ".fa";
-                    wr1.close();
-                    wr1 = new BufferedWriter(new FileWriter(new File(fileOutPath)));
-                    logic = 0;
-
-                }
-                wr1.write(lines.get(i));
-                wr1.newLine();
-                rsplit = rsplit - 1;
-                if (rsplit == 0) {
-                    rsplit = splitSize;
-                    count++;
-                    logic = 1;
-                }
-            } else {
-                wr1.write(lines.get(i));
-                wr1.newLine();
-            }
-
-        }
-        wr1.close();
-
-    }
+    public static Properties generalConfiguration = new Properties();
+    public static final String generalConfigFile = "/home/thanos/Dropbox/Code/odysseys/MasterNode/generalConfiguration.properties";
 
     public static void initializeNode(Node node, String workingDir, SSHExec ssh) throws Exception {
+
+        String initCodeFolderPath = generalConfiguration.getProperty("initCodeFolderPath");
+        String initDataFolderPath = generalConfiguration.getProperty("initDataFolderPath");
+        String nodeSpecificData = generalConfiguration.getProperty("nodeSpecificData");
+        String kamakiAuthenticationFilePath = generalConfiguration.getProperty("kamakiAuthenticationFilePath");
+
         String rootPath = "/home/" + node.username + "/" + workingDir + "/";
-        //override
-        //rootPath="/home/" + node.username + "/" + "Thu-Apr-09-002155-EEST-2015" + "/";
-        // command = "bash;" + rootPath + "code/compileTools.sh;" + rootPath + "code/cd-hit/";
         System.out.println("--------------------------------Initializing node " + node.name);
-        // cb = new ConnBean(node.ip, node.username, node.password);
-        //SSHExec ssh = SSHExec.getInstance(cb);
-        // SSHExec.
+
         ssh.connect();
-
         CustomTask sampleTask;
-
-        //sampleTask = new ExecCommand("rm -rf ~/*_experimentTBD");
-        sampleTask = new ExecCommand("rm -rf ~/*experiment*");
+        sampleTask = new ExecCommand("rm -rf ~/*deleteOnNextRunOdysseus*");
         ssh.exec(sampleTask);
 
-        ssh.uploadAllDataToServer("/home/thanos/Dropbox/NetBeansProjects/genome-profiling/WorkFlow/initCode", rootPath);
-        ssh.uploadSingleDataToServer("./list.csv", rootPath);
-        ssh.uploadSingleDataToServer("./" + node.id + ".organisms", rootPath);
-        ssh.uploadSingleDataToServer("./TreeOrder.txt", rootPath);
-        ssh.uploadSingleDataToServer("/home/thanos/.kamakirc", ("/home/" + node.username + "/"));
+        ssh.uploadAllDataToServer(initCodeFolderPath, rootPath);
+        ssh.uploadSingleDataToServer(initDataFolderPath + "/list.csv", rootPath);
+        ssh.uploadSingleDataToServer(initDataFolderPath + "/TreeOrder.txt", rootPath);
+        ssh.uploadSingleDataToServer(nodeSpecificData + "/" + node.id + ".organisms", rootPath);
+        ssh.uploadSingleDataToServer(kamakiAuthenticationFilePath, ("/home/" + node.username + "/"));
 
         sampleTask = new ExecCommand("cd " + rootPath, "mkdir remote");//,"sshfs thanos@"+node.masterAddress+":/home/thanos/Master/"+node.id+" "+rootPath+"remote/ -o nonempty");
         ssh.exec(sampleTask);
@@ -160,679 +88,18 @@ public class WorkFlow {
             sampleTask = new ExecCommand("cd " + rootPath, "mkdir master");//,"sshfs thanos@"+node.masterAddress+":/home/thanos/Master/"+node.id+" "+rootPath+"remote/ -o nonempty");
             ssh.exec(sampleTask);
         }
-
-        sampleTask = new ExecCommand("rm -f ~/load.log", "rm -f ~/log", "rm -f ~/mem.log", "screen -S clientDaemon -d -m java -jar " + rootPath + "initCode/Client.jar " + node.masterAddress + " " + node.localJobPort + " " + node.remoteJobPort, "screen -S loadLoging -d -m bash " + rootPath + "initCode/loadLogScript.sh", "screen -S memLoging -d -m bash " + rootPath + "initCode/memLogScript.sh");
+        sampleTask = new ExecCommand("screen -X -S clientDaemon kill", "screen -X -S loadLoging kill", "screen -X -S memLoging kill", "rm -f ~/load.log", "rm -f ~/log", "rm -f ~/mem.log", "screen -S clientDaemon -d -m java -jar " + rootPath + "initCode/Client.jar " + node.masterAddress + " " + node.localJobPort + " " + node.remoteJobPort, "screen -S loadLoging -d -m bash " + rootPath + "initCode/loadLogScript.sh", "screen -S memLoging -d -m bash " + rootPath + "initCode/memLogScript.sh");
         ssh.exec(sampleTask);
-
         ssh.disconnect();
 
         System.out.println("-------------------------------------------Node " + node.name + " initialized");
     }
 
-    public static void fileSizeClusterer(String filesList, ArrayList<Node> nodes) throws IOException {
-        // LinkedHashMap nodeResources
-        LinkedHashMap<String, Double> files1 = new LinkedHashMap<String, Double>();
-        LinkedHashMap<String, Double> files2 = new LinkedHashMap<String, Double>();
-        //LinkedHashMap<String, Double> files2 = new LinkedHashMap<String, Double>();
-        //List<String> cy = Files.readAllLines(Paths.get("./someCyan"), StandardCharsets.UTF_8);
+    public static void scheduler(ArrayList<Node> nodes) throws InterruptedException, IOException, Exception {
 
-        //System.out.println(cy.get(0));
-        File fileList = new File(filesList);
-        List<String> lines = Files.readAllLines(Paths.get(fileList.getAbsolutePath()), StandardCharsets.UTF_8);
-        int totalCount = 0;
-        double sumSize1 = 0;
-        double largestValue = 0;
-        // double sumSize2 = 0;
-        //double sumSize2 = 0;
-        for (int i = 0; i < lines.size(); i++) {
-            String[] temp = lines.get(i).split("MiB ");
-            //System.out.println(temp[0]);
-            //System.out.println(temp[1]);
-            if (files1.containsKey(temp[1])) {
-                //System.out.println(temp[1]);
-            }
-            // int flag = 0;
-//            for (int j = 0; j < cy.size(); j++) {
-//                if (temp[1].contains(cy.get(j))) {
-//                    System.out.println("1 " + temp[1]);
-//                    System.out.println("2 " + cy.get(j));
-//                    System.out.println();
-//                    flag = 1;
-//                    break;
-//                }
-//            }
-            // if (flag == 1) {
-            //    files2.put(temp[1], Double.valueOf(temp[0]));
-            //    sumSize2 = sumSize2 + Double.valueOf(temp[0]);
-            // } else {
-            if (i == 0) {
-                largestValue = Double.valueOf(temp[0]);
-            }
-            files1.put(temp[1], Double.valueOf(temp[0]));
-            sumSize1 = sumSize1 + Double.valueOf(temp[0]);
-            //}
-
-            // if (cy.get(0).contains(temp[1])) {
-            //    files.put(temp[1], Double.valueOf(temp[0]));
-            //    System.out.println(temp[1]);
-            //sumSize = sumSize + Double.valueOf(temp[0]);
-            // } else {
-            //}
-        }
-        double sumPower = 0;
-        for (int i = 0; i < nodes.size(); i++) {
-            sumPower = sumPower + nodes.get(i).cpuPower;
-        }
-
-        // double testsumPow
-        double oversizeStore = 0;
-
-        System.out.println("Sum size " + sumSize1 + " number " + files1.size());
-        HashMap<Double, Double> keepOversize = new HashMap<Double, Double>();
-        double minError = 1000000.0;
-        int resolution = 10000;
-        for (int s = 0; s < resolution; s++) {
-            LinkedHashMap<String, Double> testfiles = new LinkedHashMap<String, Double>();
-            testfiles.putAll(files1);
-            double maxError = 0;
-            int tot = 0;
-            //oversizeStore = sumSize1 * (double) s / resolution;
-            oversizeStore = largestValue * (double) s / resolution;
-            if (oversizeStore > largestValue) {//(3*(nodes.get(0).cpuPower / sumPower) * sumSize1) / 1.0) {
-                break;
-            }
-            //System.out.println("oversize " + oversizeStore);
-            for (int i = 0; i < nodes.size(); i++) {
-                //System.out.println();
-                //BufferedWriter wr1 = new BufferedWriter(new FileWriter(new File("./" + nodes.get(i).id + ".organisms")));
-                double size = (nodes.get(i).cpuPower / sumPower) * sumSize1;
-                //System.out.println("size"+size);
-                double total = 0.0;
-                //double oversize = 0.6;
-                double oversize = oversizeStore;
-                //oversize=65735.0991;
-                if (i == nodes.size() - 1) {
-                    oversize = 30000000.0;
-                }
-                int flag = 0;
-                String keepKey = "";
-                int count = 0;
-
-                for (Map.Entry<String, Double> entry1 : testfiles.entrySet()) {
-                    String key1 = entry1.getKey();
-                    //System.out.println(files.get(key1));
-                    if (testfiles.get(key1) > 0.0) {
-                        if (testfiles.get(key1) < size && flag == 0) {
-                            size = size - testfiles.get(key1);
-                            total = total + testfiles.get(key1);
-                            //wr1.write(key1);
-                            // wr1.newLine();
-                            testfiles.put(key1, -100.0);
-                            //files.remove(key1);
-                            count++;
-                        } else {
-                            flag = 1;
-                            if (oversize > Math.abs(size - testfiles.get(key1))) {
-                                oversize = Math.abs(size - testfiles.get(key1));
-                                keepKey = key1;
-                            }
-
-                        }
-                    }
-
-                    //System.out.println(key1 + files.get(key1));
-                }
-                if (!keepKey.equals("")) {
-                    // wr1.write(keepKey);
-                    //  wr1.newLine();
-                    total = total + testfiles.get(keepKey);
-                    testfiles.put(keepKey, -100.0);
-                    count++;
-                }
-                //wr1.write(String.valueOf(total));
-                // wr1.close();
-                totalCount = totalCount + count;
-                //System.out.println(total + " " + count + "   expected%" + (nodes.get(i).cpuPower / sumPower) + "   real%" + (total / sumSize1));
-                tot = tot + count;
-                if (maxError < (Math.abs((nodes.get(i).cpuPower / sumPower) - (total / sumSize1))) / (nodes.get(i).cpuPower / sumPower)) {
-                    maxError = (Math.abs((nodes.get(i).cpuPower / sumPower) - (total / sumSize1))) / (nodes.get(i).cpuPower / sumPower);
-                }
-
-            }
-            //System.out.println("avgError is " + maxError);
-            //System.out.println(tot);
-            if (minError > maxError && tot == testfiles.size()) {
-                minError = maxError;
-                keepOversize.put(minError, oversizeStore);
-            }
-
-        }
-
-        //oversizeStore=340000;
-        oversizeStore = keepOversize.get(minError);
-        double maxError = 0;
-        for (int i = 0; i < nodes.size(); i++) {
-            //System.out.println();
-            BufferedWriter wr1 = new BufferedWriter(new FileWriter(new File("./" + nodes.get(i).id + ".organisms")));
-            double size = (nodes.get(i).cpuPower / sumPower) * sumSize1;
-            //System.out.println("size"+size);
-            double total = 0.0;
-            //double oversize = 0.6;
-            double oversize = oversizeStore;
-            //oversize=65735.0991;
-            if (i == nodes.size() - 1) {
-                oversize = 30000000.0;
-            }
-            int flag = 0;
-            String keepKey = "";
-            int count = 0;
-
-            for (Map.Entry<String, Double> entry1 : files1.entrySet()) {
-                String key1 = entry1.getKey();
-                //System.out.println(files.get(key1));
-                if (files1.get(key1) > 0.0) {
-                    if (files1.get(key1) < size && flag == 0) {
-                        size = size - files1.get(key1);
-                        total = total + files1.get(key1);
-                        wr1.write(key1);
-                        wr1.newLine();
-                        files1.put(key1, -100.0);
-                        //files.remove(key1);
-                        count++;
-                    } else {
-                        flag = 1;
-                        if (oversize > Math.abs(size - files1.get(key1))) {
-                            oversize = Math.abs(size - files1.get(key1));
-                            keepKey = key1;
-                        }
-
-                    }
-                }
-
-                //System.out.println(key1 + files.get(key1));
-            }
-            if (!keepKey.equals("")) {
-                wr1.write(keepKey);
-                wr1.newLine();
-                total = total + files1.get(keepKey);
-                files1.put(keepKey, -100.0);
-                count++;
-            }
-            //wr1.write(String.valueOf(total));
-            wr1.close();
-            totalCount = totalCount + count;
-            System.out.println(total + " " + count + "   expected%" + (nodes.get(i).cpuPower / sumPower) + "   real%" + (total / sumSize1));
-            if (maxError < (Math.abs((nodes.get(i).cpuPower / sumPower) - (total / sumSize1))) / (nodes.get(i).cpuPower / sumPower)) {
-                maxError = (Math.abs((nodes.get(i).cpuPower / sumPower) - (total / sumSize1))) / (nodes.get(i).cpuPower / sumPower);
-            }
-
-        }
-        if (minError != maxError) {
-            System.out.println("####FATAL ERROR something went wrong, minError found is not same with minError in set written");
-        }
-        System.out.println("CrossCheck minError " + minError + " =  " + maxError);
-        System.out.println();
-        System.out.println("caynobacteria, number " + files2.size());
-        System.out.println();
-
-        /*
-         for (int i = 0; i < nodes.size(); i++) {
-         System.out.println();
-         BufferedWriter wr1 = new BufferedWriter(new FileWriter(new File("./" + nodes.get(i).id + ".organisms"), true));
-         double size = (nodes.get(i).cpuPower / sumPower) * sumSize2;
-         //System.out.println("size"+size);
-         double total = 0.0;
-         double oversize = 0.6;
-         if (i == nodes.size() - 1) {
-         oversize = 10000000;
-         }
-         int flag = 0;
-         String keepKey = "";
-         int count = 0;
-
-         for (Map.Entry<String, Double> entry1 : files2.entrySet()) {
-         String key1 = entry1.getKey();
-         //System.out.println(files.get(key1));
-         if (files2.get(key1) > 0.0) {
-         if (files2.get(key1) < size && flag == 0) {
-         size = size - files2.get(key1);
-         total = total + files2.get(key1);
-         wr1.write(key1);
-         wr1.newLine();
-         files2.put(key1, -100.0);
-         //files.remove(key1);
-         count++;
-         } else {
-         flag = 1;
-         if (oversize > Math.abs(size - files2.get(key1))) {
-         oversize = Math.abs(size - files2.get(key1));
-         keepKey = key1;
-         }
-
-         }
-         }
-
-         //System.out.println(key1 + files.get(key1));
-         }
-         if (!keepKey.equals("")) {
-         wr1.write(keepKey);
-         wr1.newLine();
-         total = total + files2.get(keepKey);
-         files2.put(keepKey, -100.0);
-         count++;
-         }
-         //wr1.write(String.valueOf(total));
-         wr1.close();
-         totalCount = totalCount + count;
-         System.out.println(total + " " + count + "   expected%" + (nodes.get(i).cpuPower / sumPower) + "   real%" + (total / sumSize2));
-         }
-         System.out.println("total organisms added " + totalCount);
-         */
-        String chkpath = "./";
-        HashMap<String, Integer> chkDoubles = new HashMap<String, Integer>(100);
-        int recount = 0;
-        for (int i = 0; i < nodes.size(); i++) {
-            String f = nodes.get(i).id + ".organisms";
-            List<String> f1 = Files.readAllLines(Paths.get(f), StandardCharsets.UTF_8);
-            for (int j = 0; j < f1.size(); j++) {
-                if (chkDoubles.containsKey(f1.get(j))) {
-                    System.out.println("FATAL ERROR, duplicate found @ " + f1.get(j));
-                } else {
-                    //System.out.println(f1.get(j));
-                    recount++;
-                    chkDoubles.put(f1.get(j), 1);
-                }
-            }
-        }
-        System.out.println("Recount is " + recount);
-
-    }
-
-    public static void fileSizeClusterer2(String filesList, ArrayList<Node> nodes) throws IOException {
-        // LinkedHashMap nodeResources
-        LinkedHashMap<String, Double> files1 = new LinkedHashMap<String, Double>();
-        LinkedHashMap<String, Double> files2 = new LinkedHashMap<String, Double>();
-        LinkedHashMap<String, Double> filesKeepCopy = new LinkedHashMap<String, Double>();
-        //LinkedHashMap<String, Double> files2 = new LinkedHashMap<String, Double>();
-        List<String> cy = Files.readAllLines(Paths.get("./someCyan"), StandardCharsets.UTF_8);
-
-        //System.out.println(cy.get(0));
-        File fileList = new File(filesList);
-        List<String> lines = Files.readAllLines(Paths.get(fileList.getAbsolutePath()), StandardCharsets.UTF_8);
-        int totalCount = 0;
-        double sumSize1 = 0;
-        double largestValue = 0;
-        // double sumSize2 = 0;
-        double sumSize2 = 0;
-        for (int i = 0; i < lines.size(); i++) {
-            String[] temp = lines.get(i).split("MiB ");
-            //System.out.println(temp[0]);
-            //System.out.println(temp[1]);
-            if (files1.containsKey(temp[1])) {
-                //System.out.println(temp[1]);
-            }
-            int flag = 0;
-            if (i == 0) {
-                largestValue = Double.valueOf(temp[0]);
-            }
-            for (int j = 0; j < cy.size(); j++) {
-                if (temp[1].contains(cy.get(j))) {
-                    //System.out.println("1 " + temp[1]);
-                    //System.out.println("2 " + cy.get(j));
-                    //System.out.println();
-                    flag = 1;
-                    break;
-                }
-            }
-            if (flag == 1) {
-                //System.out.println(temp[1]);
-                files2.put(temp[1], Double.valueOf(temp[0]));
-                sumSize2 = sumSize2 + Double.valueOf(temp[0]);
-            } else {
-
-                files1.put(temp[1], Double.valueOf(temp[0]));
-                sumSize1 = sumSize1 + Double.valueOf(temp[0]);
-            }
-
-            // if (cy.get(0).contains(temp[1])) {
-            //    files.put(temp[1], Double.valueOf(temp[0]));
-            //    System.out.println(temp[1]);
-            //sumSize = sumSize + Double.valueOf(temp[0]);
-            // } else {
-            //}
-        }
-        double sumPower = 0;
-        for (int i = 0; i < nodes.size(); i++) {
-            sumPower = sumPower + nodes.get(i).cpuPower;
-        }
-
-        // double testsumPow
-        double oversizeStore = 0;
-
-        System.out.println("Sum size " + sumSize1 + " number " + files1.size());
-        HashMap<Double, Double> keepOversize = new HashMap<Double, Double>();
-        double minError = 1000000.0;
-        int resolution = 10000;
-        for (int s = 0; s < resolution; s++) {
-            LinkedHashMap<String, Double> testfiles = new LinkedHashMap<String, Double>();
-            testfiles.putAll(files1);
-            double maxError = 0;
-            int tot = 0;
-            //oversizeStore = sumSize1 * (double) s / resolution;
-            oversizeStore = largestValue * (double) s / resolution;
-            if (oversizeStore > largestValue) {//(3*(nodes.get(0).cpuPower / sumPower) * sumSize1) / 1.0) {
-                break;
-            }
-            //System.out.println("oversize " + oversizeStore);
-            for (int i = 0; i < nodes.size(); i++) {
-                //System.out.println();
-                //BufferedWriter wr1 = new BufferedWriter(new FileWriter(new File("./" + nodes.get(i).id + ".organisms")));
-                double size = (nodes.get(i).cpuPower / sumPower) * sumSize1;
-                //System.out.println("size"+size);
-                double total = 0.0;
-                //double oversize = 0.6;
-                double oversize = oversizeStore;
-                //oversize=65735.0991;
-                if (i == nodes.size() - 1) {
-                    oversize = 30000000.0;
-                }
-                int flag = 0;
-                String keepKey = "";
-                int count = 0;
-
-                for (Map.Entry<String, Double> entry1 : testfiles.entrySet()) {
-                    String key1 = entry1.getKey();
-                    //System.out.println(files.get(key1));
-                    if (testfiles.get(key1) > 0.0) {
-                        if (testfiles.get(key1) < size && flag == 0) {
-                            size = size - testfiles.get(key1);
-                            total = total + testfiles.get(key1);
-                            //wr1.write(key1);
-                            // wr1.newLine();
-                            testfiles.put(key1, -100.0);
-                            //files.remove(key1);
-                            count++;
-                        } else {
-                            flag = 1;
-                            if (oversize > Math.abs(size - testfiles.get(key1))) {
-                                oversize = Math.abs(size - testfiles.get(key1));
-                                keepKey = key1;
-                            }
-
-                        }
-                    }
-
-                    //System.out.println(key1 + files.get(key1));
-                }
-                if (!keepKey.equals("")) {
-                    // wr1.write(keepKey);
-                    //  wr1.newLine();
-                    total = total + testfiles.get(keepKey);
-                    testfiles.put(keepKey, -100.0);
-                    count++;
-                }
-                //wr1.write(String.valueOf(total));
-                // wr1.close();
-                totalCount = totalCount + count;
-                //System.out.println(total + " " + count + "   expected%" + (nodes.get(i).cpuPower / sumPower) + "   real%" + (total / sumSize1));
-                tot = tot + count;
-                if (maxError < (Math.abs((nodes.get(i).cpuPower / sumPower) - (total / sumSize1))) / (nodes.get(i).cpuPower / sumPower)) {
-                    maxError = (Math.abs((nodes.get(i).cpuPower / sumPower) - (total / sumSize1))) / (nodes.get(i).cpuPower / sumPower);
-                }
-
-            }
-            //System.out.println("avgError is " + maxError);
-            //System.out.println(tot);
-            if (minError > maxError && tot == testfiles.size()) {
-                minError = maxError;
-                keepOversize.put(minError, oversizeStore);
-            }
-
-        }
-
-        //oversizeStore=340000;
-        filesKeepCopy.putAll(files1);
-        oversizeStore = keepOversize.get(minError);
-        double maxError = 0;
-        for (int i = 0; i < nodes.size(); i++) {
-            //System.out.println();
-            BufferedWriter wr1 = new BufferedWriter(new FileWriter(new File("./" + nodes.get(i).id + ".organisms")));
-            double size = (nodes.get(i).cpuPower / sumPower) * sumSize1;
-            //System.out.println("size"+size);
-            double total = 0.0;
-            //double oversize = 0.6;
-            double oversize = oversizeStore;
-            //oversize=65735.0991;
-            if (i == nodes.size() - 1) {
-                oversize = 30000000.0;
-            }
-            int flag = 0;
-            String keepKey = "";
-            int count = 0;
-
-            for (Map.Entry<String, Double> entry1 : files1.entrySet()) {
-                String key1 = entry1.getKey();
-                //System.out.println(files.get(key1));
-                if (files1.get(key1) > 0.0) {
-                    if (files1.get(key1) < size && flag == 0) {
-                        size = size - files1.get(key1);
-                        total = total + files1.get(key1);
-                        wr1.write(key1);
-                        wr1.newLine();
-                        files1.put(key1, -100.0);
-                        //files.remove(key1);
-                        count++;
-                    } else {
-                        flag = 1;
-                        if (oversize > Math.abs(size - files1.get(key1))) {
-                            oversize = Math.abs(size - files1.get(key1));
-                            keepKey = key1;
-                        }
-
-                    }
-                }
-
-                //System.out.println(key1 + files.get(key1));
-            }
-            if (!keepKey.equals("")) {
-                wr1.write(keepKey);
-                wr1.newLine();
-                total = total + files1.get(keepKey);
-                files1.put(keepKey, -100.0);
-                count++;
-            }
-            //wr1.write(String.valueOf(total));
-            wr1.close();
-            totalCount = totalCount + count;
-            System.out.println(total + " " + count + "   expected%" + (nodes.get(i).cpuPower / sumPower) + "   real%" + (total / sumSize1));
-            if (maxError < (Math.abs((nodes.get(i).cpuPower / sumPower) - (total / sumSize1))) / (nodes.get(i).cpuPower / sumPower)) {
-                maxError = (Math.abs((nodes.get(i).cpuPower / sumPower) - (total / sumSize1))) / (nodes.get(i).cpuPower / sumPower);
-            }
-
-        }
-        if (minError != maxError) {
-            System.out.println("####FATAL ERROR something went wrong, minError found is not same with minError in set written");
-        }
-        System.out.println("CrossCheck minError " + minError + " =  " + maxError);
-        System.out.println();
-        System.out.println("caynobacteria, number " + files2.size());
-        System.out.println();
-
-        //CHANGE IT HERE
-        //files1 = files2;
-        files1.clear();
-        files1.putAll(files2);
-        sumSize1 = sumSize2;
-
-        System.out.println("Sum size " + sumSize1 + " number " + files1.size());
-        //HashMap<Double, Double> keepOversize = new HashMap<Double, Double>();
-        minError = 1000000.0;
-        //resolution = resolution;
-        for (int s = 0; s < resolution; s++) {
-            LinkedHashMap<String, Double> testfiles = new LinkedHashMap<String, Double>();
-            testfiles.putAll(files1);
-            maxError = 0;
-            int tot = 0;
-            //oversizeStore = sumSize1 * (double) s / resolution;
-            oversizeStore = largestValue * (double) s / resolution;
-            if (oversizeStore > largestValue) {//(3*(nodes.get(0).cpuPower / sumPower) * sumSize1) / 1.0) {
-                break;
-            }
-            //System.out.println("oversize " + oversizeStore);
-            for (int i = 0; i < nodes.size(); i++) {
-                //System.out.println();
-                //BufferedWriter wr1 = new BufferedWriter(new FileWriter(new File("./" + nodes.get(i).id + ".organisms")));
-                double size = (nodes.get(i).cpuPower / sumPower) * sumSize1;
-                //System.out.println("size"+size);
-                double total = 0.0;
-                //double oversize = 0.6;
-                double oversize = oversizeStore;
-                //oversize=65735.0991;
-                if (i == nodes.size() - 1) {
-                    oversize = 30000000.0;
-                }
-                int flag = 0;
-                String keepKey = "";
-                int count = 0;
-
-                for (Map.Entry<String, Double> entry1 : testfiles.entrySet()) {
-                    String key1 = entry1.getKey();
-                    //System.out.println(files.get(key1));
-                    if (testfiles.get(key1) > 0.0) {
-                        if (testfiles.get(key1) < size && flag == 0) {
-                            size = size - testfiles.get(key1);
-                            total = total + testfiles.get(key1);
-                            //wr1.write(key1);
-                            // wr1.newLine();
-                            testfiles.put(key1, -100.0);
-                            //files.remove(key1);
-                            count++;
-                        } else {
-                            flag = 1;
-                            if (oversize > Math.abs(size - testfiles.get(key1))) {
-                                oversize = Math.abs(size - testfiles.get(key1));
-                                keepKey = key1;
-                            }
-
-                        }
-                    }
-
-                    //System.out.println(key1 + files.get(key1));
-                }
-                if (!keepKey.equals("")) {
-                    // wr1.write(keepKey);
-                    //  wr1.newLine();
-                    total = total + testfiles.get(keepKey);
-                    testfiles.put(keepKey, -100.0);
-                    count++;
-                }
-                //wr1.write(String.valueOf(total));
-                // wr1.close();
-                totalCount = totalCount + count;
-                //System.out.println(total + " " + count + "   expected%" + (nodes.get(i).cpuPower / sumPower) + "   real%" + (total / sumSize1));
-                tot = tot + count;
-                if (maxError < (Math.abs((nodes.get(i).cpuPower / sumPower) - (total / sumSize1))) / (nodes.get(i).cpuPower / sumPower)) {
-                    maxError = (Math.abs((nodes.get(i).cpuPower / sumPower) - (total / sumSize1))) / (nodes.get(i).cpuPower / sumPower);
-                }
-
-            }
-            //System.out.println("avgError is " + maxError);
-            //System.out.println(tot);
-            if (minError > maxError && tot == testfiles.size()) {
-                minError = maxError;
-                keepOversize.put(minError, oversizeStore);
-            }
-
-        }
-
-        //oversizeStore=340000;
-        oversizeStore = keepOversize.get(minError);
-        maxError = 0;
-        for (int i = 0; i < nodes.size(); i++) {
-            //System.out.println();
-            BufferedWriter wr1 = new BufferedWriter(new FileWriter(new File("./" + nodes.get(i).id + ".organisms"), true));
-            double size = (nodes.get(i).cpuPower / sumPower) * sumSize1;
-            //System.out.println("size"+size);
-            double total = 0.0;
-            //double oversize = 0.6;
-            double oversize = oversizeStore;
-            //oversize=65735.0991;
-            if (i == nodes.size() - 1) {
-                oversize = 30000000.0;
-            }
-            int flag = 0;
-            String keepKey = "";
-            int count = 0;
-
-            for (Map.Entry<String, Double> entry1 : files1.entrySet()) {
-                String key1 = entry1.getKey();
-                //System.out.println(files.get(key1));
-                if (files1.get(key1) > 0.0) {
-                    if (files1.get(key1) < size && flag == 0) {
-                        size = size - files1.get(key1);
-                        total = total + files1.get(key1);
-                        wr1.write(key1);
-                        wr1.newLine();
-                        files1.put(key1, -100.0);
-                        //files.remove(key1);
-                        count++;
-                    } else {
-                        flag = 1;
-                        if (oversize > Math.abs(size - files1.get(key1))) {
-                            oversize = Math.abs(size - files1.get(key1));
-                            keepKey = key1;
-                        }
-
-                    }
-                }
-
-                //System.out.println(key1 + files.get(key1));
-            }
-            if (!keepKey.equals("")) {
-                wr1.write(keepKey);
-                wr1.newLine();
-                total = total + files1.get(keepKey);
-                files1.put(keepKey, -100.0);
-                count++;
-            }
-            //wr1.write(String.valueOf(total));
-            wr1.close();
-            totalCount = totalCount + count;
-            System.out.println(total + " " + count + "   expected%" + (nodes.get(i).cpuPower / sumPower) + "   real%" + (total / sumSize1));
-            if (maxError < (Math.abs((nodes.get(i).cpuPower / sumPower) - (total / sumSize1))) / (nodes.get(i).cpuPower / sumPower)) {
-                maxError = (Math.abs((nodes.get(i).cpuPower / sumPower) - (total / sumSize1))) / (nodes.get(i).cpuPower / sumPower);
-            }
-
-        }
-        if (minError != maxError) {
-            System.out.println("####FATAL ERROR something went wrong, minError found is not same with minError in set written");
-        }
-        System.out.println("CrossCheck minError " + minError + " =  " + maxError);
-        System.out.println();
-        System.out.println("caynobacteria, number " + files2.size());
-        System.out.println();
-
-        String chkpath = "./";
-        HashMap<String, Integer> chkDoubles = new HashMap<String, Integer>(100);
-        int recount = 0;
-        for (int i = 0; i < nodes.size(); i++) {
-            String f = nodes.get(i).id + ".organisms";
-            List<String> f1 = Files.readAllLines(Paths.get(f), StandardCharsets.UTF_8);
-            for (int j = 0; j < f1.size(); j++) {
-                if (chkDoubles.containsKey(f1.get(j))) {
-                    System.out.println("FATAL ERROR, duplicate found @ " + f1.get(j));
-                } else {
-                    //System.out.println(f1.get(j));
-                    recount++;
-                    chkDoubles.put(f1.get(j), 1);
-                }
-            }
-        }
-        System.out.println("Recount is " + recount);
-
-    }
-
-    public static void scheduler(ArrayList<Node> nodes, String chunkSize, String descriptionAddon) throws InterruptedException, IOException, Exception {
+        String chunkSize = generalConfiguration.getProperty("chunkSize");
+        String descriptionAddon = generalConfiguration.getProperty("descriptionAddon");
+        descriptionAddon = descriptionAddon + "_chunkSize=" + chunkSize;
 
         String workingDir = (new Date()).toString() + "_" + descriptionAddon;// + "_experimentTBD";
         workingDir = workingDir.replaceAll(" ", "-");
@@ -840,20 +107,20 @@ public class WorkFlow {
         ArrayList<NodeThread> NodeThreads = new ArrayList<NodeThread>();
         ConnBean cb = new ConnBean(nodes.get(0).ip, nodes.get(0).username, nodes.get(0).password);
         SSHExec ssh = SSHExec.getInstance(cb);
+        ArrayList<Component> componentsTobeExecuted = new ArrayList<Component>();
+
         for (int i = 0; i < nodes.size(); i++) {
-            //ConnBean cb = new ConnBean(nodes.get(i).ip, nodes.get(i).username, nodes.get(i).password);
-            if (i == 0) {
-                if ((nodes.get(i).enabled.equals("enabled"))) {
-                    cb.setHost(nodes.get(i).ip);
-                    cb.setUser(nodes.get(i).username);
-                    cb.setPassword(nodes.get(i).password);
-                    initializeNode(nodes.get(i), workingDir, ssh);
-                    NodeThread t = new NodeThread(nodes.get(i).id, nodes.get(i), workingDir, chunkSize);
-                    TimeUnit.SECONDS.sleep(5);
-                    NodeThreads.add(t);
-                }
+
+            if ((nodes.get(i).enabled.equals("enabled"))) {
+                cb.setHost(nodes.get(i).ip);
+                cb.setUser(nodes.get(i).username);
+                cb.setPassword(nodes.get(i).password);
+                initializeNode(nodes.get(i), workingDir, ssh);
+                NodeThread t = new NodeThread(nodes.get(i).id, nodes.get(i), workingDir, chunkSize, componentsTobeExecuted);
+                TimeUnit.SECONDS.sleep(5);
+                NodeThreads.add(t);
             }
-            //t.start();
+
         }
         for (int i = 0; i < NodeThreads.size(); i++) {
             NodeThreads.get(i).start();
@@ -864,62 +131,69 @@ public class WorkFlow {
 
     }
 
-    public static void buildNodeComponentExecutionList(ArrayList<Node> nodes,ArrayList<Component> componentsGeneral) {
-        
-        for(int i=0;i<nodes.size();i++)
-        {
-            
+    public static void buildNodeComponentExecutionList(ArrayList<Node> nodes, ArrayList<Component> componentsGeneral) {
+
+        for (int i = 0; i < nodes.size(); i++) {
+
         }
 
     }
 
+    public static ArrayList<Node> constructNodes(String filename) throws IOException {
+
+        List<String> lines = Files.readAllLines(Paths.get(filename), StandardCharsets.UTF_8);
+        ArrayList<Node> nodes = new ArrayList<Node>();
+
+        for (int i = 1; i < lines.size(); i++) {
+            if (!lines.contains("//")) {
+                String[] tmp = lines.get(i).split(",");
+                String tunnelIp;
+                if (tmp[0].toLowerCase().equals("enabled")) {
+                    if (!tmp[5].toLowerCase().equals("null")) {
+                        tunnelIp = tmp[5];
+                    } else {
+                        tunnelIp = "";
+                    }
+                    String enabled = "false";
+                    if (tmp[0].toLowerCase().equals("enabled")) {
+                        enabled = "enabled";
+                    }
+                    System.out.println(enabled + " " + tmp[2] + " " + Integer.valueOf(tmp[3]) + " " + tmp[4] + " " + tunnelIp + " " + tmp[6] + " " + tmp[7] + " " + Double.valueOf(tmp[8]) + " " + tmp[9] + " " + tmp[10] + " " + tmp[11] + " " + tmp[12]);
+                    Node n0 = new Node(enabled, tmp[2], Integer.valueOf(tmp[3]), tmp[4], tunnelIp, tmp[6], tmp[7], Double.valueOf(tmp[8]), tmp[9], tmp[10], tmp[11], tmp[12]); //30292 score, 24 threads 
+                    if (tmp[1].toLowerCase().equals("true")) {
+                        n0.ismaster = true;
+                    }
+                    nodes.add(n0);
+                }
+            }
+
+        }
+        return nodes;
+
+        //Node n1 = new Node("enabled", "Aphrodite", 1, "155.207.19.43", "", "thanos", "1212", 180410.9, masterIp, "30444", "30431", "12");
+    }
+
     public static void main(String[] args) throws IOException, InterruptedException, Exception {
 
-        String mainPath = "/home/thanos/Fotis/chlamydia/";
-        String blastDbPath = "/home/thanos/Fotis/chlamydia/blastDB/ChlamydiaDB";
-        String blastOutPath = "/home/thanos/Fotis/chlamydia/blastHumanVsChla/";
-        String pathwaysPath = "/home/thanos/Fotis/plantsProject/pathways";
-        String originalfastaFolderPath = "/home/thanos/Fotis/chlamydia/HumanOriginal/";
-        String organismsWithIDFolder = "/home/thanos/Fotis/chlamydia/HumanWithID/";
-        String HumanlistPath = "/home/thanos/Fotis/chlamydia/humanList.csv";
-//
-        String cdHitScriptPath = "/home/thanos/NetBeansProjects/genome-profiling/WorkFlow/src/workflow/cdHIT_makeBlastDB.sh";
+        FileInputStream generalConfigurationFile
+                = new FileInputStream(generalConfigFile);
+        try {
+            generalConfiguration.load(generalConfigurationFile);
+            generalConfigurationFile.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
 
-        ArrayList<Node> nodes = new ArrayList<Node>();
-        //nodes.add(n2);
-    
-     
-     
-
-        nodes.add(n0);
-        nodes.add(n1);
-        nodes.add(n2);
-        nodes.add(n3);
-        nodes.add(n4);
-        nodes.add(n5);
-
-
-
-        nodes.add(n6);
-        nodes.add(n7);
-        nodes.add(n8);
-        nodes.add(n9);
-        nodes.add(n10);
-        nodes.add(n11);
-        nodes.add(n12);
-        nodes.add(n13);
-
-        //*/
-        fileSizeClusterer2("./95PithosFileListOrderedScore", nodes);
-
+        ArrayList<Node> nodes = constructNodes(generalConfiguration.getProperty("nodesFile"));
+        //fileSizeClusterer2(generalConfiguration.getProperty("OUnamesAndSizesPath"), nodes);
+        ExternalScheduler.fileSizeClusterer("/home/thanos/Dropbox/Code/odysseys/variousInputFiles/list.csv", "/home/thanos/Dropbox/Code/odysseys/MasterNode/initData/95PithosFileListOrderedScore", nodes, "/home/thanos/Dropbox/Code/odysseys/MasterNode/nodeSpecificData");
         //register available nodes
         //identify the workflow and define it
         //create threads = number of nodes
         //ssh to each node and execute code
-        String chunkSize = "500";
-        String descriptionAddon = "plantsAVAagain=" + chunkSize + "_experimentTBD";
-        //COUNTDOWN_12_NewThreads
-        //scheduler(nodes, componentsOrdered, chunkSize, descriptionAddon);
+
+        scheduler(nodes);
     }
 
 }

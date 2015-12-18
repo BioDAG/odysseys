@@ -1,0 +1,50 @@
+id=$1
+threads=$2
+cd ~
+rm -rf currentRun
+mkdir currentRun
+cd currentRun
+echo node $1 >> log
+echo theads $2 >> log
+echo $(date +"%T") >> log
+kamaki file download -N /pithos/taverna/input/loadLogScript.sh >/dev/null 2>/dev/null
+kamaki file download -N /pithos/taverna/input/memLogScript.sh >/dev/null 2>/dev/null
+kamaki file download -N /pithos/taverna/input/naivePhylogeneticProfiles.jar >/dev/null 2>/dev/null
+
+screen -S loadLoging -d -m bash loadLogScript.sh
+screen -S memLoging -d -m bash memLogScript.sh
+
+kamaki file download -N -r /pithos/taverna/input/cyanobacteriaWithID >/dev/null 2>/dev/null
+kamaki file download -N /pithos/taverna/input/cyanobacteria.fasta >/dev/null 2>/dev/null
+kamaki file download -N /pithos/taverna/input/chunk_$id.fa >/dev/null 2>/dev/null
+
+
+/opt/ncbi-blast-2.2.30+/bin/makeblastdb -in cyanobacteria.fasta -dbtype prot -out DB -hash_index -parse_seqids
+
+echo blasting >> log
+begin=$(date +"%s")
+echo $(date +"%T") >> log
+/opt/ncbi-blast-2.2.30+/bin/blastp -query chunk_$id.fa -db DB -evalue  0.000001 -outfmt 6 -out out1.blastp -num_threads $threads
+termin=$(date +"%s")
+echo $(date +"%T") >> log
+difftimelps=$(($termin-$begin))
+echo blastTime $difftimelps >> log
+
+echo profiling >> log
+begin=$(date +"%s")
+echo $(date +"%T") >> log
+java -jar naivePhylogeneticProfiles.jar chunk_$id.fa
+termin=$(date +"%s")
+echo $(date +"%T") >> log
+difftimelps=$(($termin-$begin))
+echo ProfTime $difftimelps >> log
+
+echo killing loggers >> log
+screen -X -S loadLoging kill
+screen -X -S memLoging kill
+
+echo uploading >> log
+kamaki file upload -N mem.log /pithos/taverna/logs/$id/mem.log >/dev/null 2>/dev/null
+kamaki file upload -N load.log /pithos/taverna/logs/$id/load.log >/dev/null 2>/dev/null
+kamaki file upload -N log /pithos/taverna/logs/$id/log >/dev/null 2>/dev/null
+echo all done >> log

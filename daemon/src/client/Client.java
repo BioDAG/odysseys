@@ -1,39 +1,41 @@
 /*
-The MIT License (MIT)
+ The MIT License (MIT)
 
-Copyright (c) 2014 BioDAG
+ Copyright (c) 2014 BioDAG
 
-Odysseus: a versatile high-performance framework for enabling bioinformatics workflows on
-hybrid cloud environments
+ Odysseus: a versatile high-performance framework for enabling bioinformatics workflows on
+ hybrid cloud environments
 
-Athanassios M. Kintsakis akintsakis@issel.ee.auth.gr
-Fotis E. Psomopoulos     fpsom@issel.ee.auth.gr
-Perciles A. Mitkas       mitkas@auth.gr
+ Athanassios M. Kintsakis akintsakis@issel.ee.auth.gr
+ Fotis E. Psomopoulos     fpsom@issel.ee.auth.gr
+ Perciles A. Mitkas       mitkas@auth.gr
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
 
-Author: Athanassios Kintsakis
-contact: akintsakis@issel.ee.auth.gr
+ Author: Athanassios Kintsakis
+ contact: akintsakis@issel.ee.auth.gr
  */
 package client;
 
-
+import static client.Client.executeBashScript;
+import static client.Client.talker;
+import static client.Client.waitForCommand;
 import java.net.*;
 import java.io.*;
 import java.util.Date;
@@ -160,172 +162,335 @@ public class Client {
         long t1 = 0;
         long t3;
         long t4;
-        int logic = 0;
+        int firstCommandReceived = 0;
         String proc = "";
 
         while (true) {
             incoming = waitForCommand();
-            if (logic == 0) {
-                logic = 1;
+
+//            if (firstCommandReceived == 0) {
+//                firstCommandReceived = 1;
+//                wr1.write(incoming);
+//                wr1.newLine();
+//                wr1.write((new Date()).toString());
+//                wr1.newLine();
+//                System.out.println("Initializing with parameters: "+incoming);
+//                talker("Initialized @    " + (new Date()).toString()+" with parameters "+incoming, masterAddress, masterJobPort);
+//                t1 = System.currentTimeMillis();
+//            } else {
+            if (incoming.contains("<cmd>")) {
+                talker("Bundle received" + incoming + ".. exiting communications @    " + (new Date()).toString(), masterAddress, masterJobPort);
+                String[] bundle = incoming.split("<cmd>");
+                System.out.println("commands received in bundle : "+bundle.length);
+                System.out.println("all INCOMING::::: " + incoming);
+                //TimeUnit.SECONDS.sleep(50);
+                for (int b = 0; b < bundle.length; b++) {
+
+                    incoming = bundle[b];
+                    System.out.println("1 COMMAND :" + incoming);
+                    //TimeUnit.SECONDS.sleep(50);
+                    if (incoming.contains(("tarUpload"))) {
+                        wr1.write("final write before uploading...");
+                        //wr1.flush();
+                        long t2 = System.currentTimeMillis();
+                        wr1.write(String.valueOf((t2 - t1)));
+                        wr1.newLine();
+                        wr1.write("success exit");
+                        wr1.newLine();
+                        wr1.write((new Date()).toString());
+                        wr1.close();
+                        System.out.println("bundle| incoming: " + incoming);
+                        //System.out.println("END REACHED.. exiting");
+
+                        command = incoming.split(";");
+                        proc = executeBashScript(command);
+                        if (!proc.isEmpty()) {
+                            System.out.println("sending :" + "FAILURE @ " + incoming);
+                            //wr1.write("Bundle| FAILED END (with upload).. exiting @    " + (new Date()).toString());
+                        } else {
+                            System.out.println("sending :" + "SUCCESS @ " + incoming);
+                            //wr1.write("Bundle| SUCCESS END on upload).. exiting @    " + (new Date()).toString());
+                        }
+                        //wr1.close();
+                        break;
+                    } else if (incoming.contains("terminate")) {
+                        System.out.println("Bundle| END REACHED.. exiting");
+                        //talker("END REACHED.. exiting @    " + (new Date()).toString(), masterAddress, masterJobPort);
+                        long t2 = System.currentTimeMillis();
+                        wr1.write(String.valueOf((t2 - t1)));
+                        wr1.newLine();
+                        wr1.write("success exit");
+                        wr1.newLine();
+                        wr1.write((new Date()).toString());
+                        wr1.close();
+                        break;
+
+                    } else {
+                        System.out.println("bundle | incoming: " + incoming);
+                        command = incoming.split(";");
+                        t3 = System.currentTimeMillis();
+                        wr1.write((new Date()).toString());
+                        proc = executeBashScript(command);
+                        wr1.newLine();
+                        wr1.write(incoming);
+                        wr1.newLine();
+                        t4 = System.currentTimeMillis();
+                        wr1.write(String.valueOf(t4 - t3));
+                        wr1.newLine();
+                        wr1.write((new Date()).toString());
+                        wr1.newLine();
+                        wr1.newLine();
+                        if (!proc.isEmpty()) {
+                            System.out.println("sending :" + "FAILURE @ " + incoming);
+                            wr1.write("Bundle, FAILED . exiting @    " + (new Date()).toString() + " on command " + incoming);
+                        } else {
+                            System.out.println("sending :" + "SUCCESS @ " + incoming);
+                            wr1.write("Bundle, SUCCESS ).. exiting @    " + (new Date()).toString() + " on command " + incoming);
+                        }
+                        wr1.flush();
+                    }
+                }
+
+                break;
+            }
+
+            if (incoming.contains("terminate")) {
+                System.out.println("END REACHED.. exiting");
+                talker("END REACHED.. exiting @    " + (new Date()).toString(), masterAddress, masterJobPort);
+                long t2 = System.currentTimeMillis();
+                wr1.write(String.valueOf((t2 - t1)));
+                wr1.newLine();
+                wr1.write("success exit");
+                wr1.newLine();
+                wr1.write((new Date()).toString());
+                wr1.close();
+                break;
+            } else if (incoming.contains("timeout")) {
+                System.out.println("server not sending... exiting");
+                talker("server not sending... exiting", masterAddress, masterJobPort);
+                long t2 = System.currentTimeMillis();
+                wr1.write(String.valueOf((t2 - t1)));
+                wr1.newLine();
+                wr1.write("timeout Exit");
+                wr1.newLine();
+                wr1.write((new Date()).toString());
+                wr1.close();
+                break;
+
+            }
+            if (incoming.contains(("tarUpload"))) {
+                wr1.write("final write before uploading...");
+                //wr1.flush();
+                long t2 = System.currentTimeMillis();
+                wr1.write(String.valueOf((t2 - t1)));
+                wr1.newLine();
+                wr1.write("success exit");
+                wr1.newLine();
+                wr1.write((new Date()).toString());
+                wr1.close();
+                System.out.println("incoming: " + incoming);
+                //System.out.println("END REACHED.. exiting");
+
+                command = incoming.split(";");
+                proc = executeBashScript(command);
+                if (!proc.isEmpty()) {
+                    System.out.println("sending :" + "FAILURE @ " + incoming);
+                    talker("FAILED END (with upload).. exiting @    " + (new Date()).toString(), masterAddress, masterJobPort);
+                } else {
+                    System.out.println("sending :" + "SUCCESS @ " + incoming);
+                    talker("SUCCESS END on upload).. exiting @    " + (new Date()).toString(), masterAddress, masterJobPort);
+                }
+
+                break;
+            } else {
+                System.out.println("incoming: " + incoming);
+                command = incoming.split(";");
+                t3 = System.currentTimeMillis();
+                wr1.write((new Date()).toString());
+                proc = executeBashScript(command);
+                wr1.newLine();
                 wr1.write(incoming);
+                wr1.newLine();
+                t4 = System.currentTimeMillis();
+                wr1.write(String.valueOf(t4 - t3));
                 wr1.newLine();
                 wr1.write((new Date()).toString());
                 wr1.newLine();
-                System.out.println("Initializing with parameters: "+incoming);
-                talker("Initialized @    " + (new Date()).toString()+" with parameters "+incoming, masterAddress, masterJobPort);
-                t1 = System.currentTimeMillis();
-            } else {
-                if (incoming.contains("!")) {
-                    talker("Bundle received"+incoming+".. exiting communications @    " + (new Date()).toString(), masterAddress, masterJobPort);
-                    String[] bundle = incoming.split("!");
-                    System.out.println("all INCOMING::::: "+incoming);
-                    //TimeUnit.SECONDS.sleep(50);
-                    for (int b = 0; b < bundle.length; b++) {
-                        
-                        incoming = bundle[b];
-                        System.out.println("1 COMMAND :"+incoming);
-                        //TimeUnit.SECONDS.sleep(50);
-                        if (incoming.contains(("tarUpload"))) {
-                            wr1.write("final write before uploading...");
-                            //wr1.flush();
-                            long t2 = System.currentTimeMillis();
-                            wr1.write(String.valueOf((t2 - t1)));
-                            wr1.newLine();
-                            wr1.write("success exit");
-                            wr1.newLine();
-                            wr1.write((new Date()).toString());
-                            wr1.close();
-                            System.out.println("bundle| incoming: " + incoming);
-                            //System.out.println("END REACHED.. exiting");
-
-                            command = incoming.split(";");
-                            proc = executeBashScript(command);
-                            if (!proc.isEmpty()) {
-                                System.out.println("sending :" + "FAILURE @ " + incoming);
-                                //wr1.write("Bundle| FAILED END (with upload).. exiting @    " + (new Date()).toString());
-                            } else {
-                                System.out.println("sending :" + "SUCCESS @ " + incoming);
-                                 //wr1.write("Bundle| SUCCESS END on upload).. exiting @    " + (new Date()).toString());
-                            }
-                            //wr1.close();
-                            break;
-                        } else if (incoming.contains("terminate")) {
-                            System.out.println("Bundle| END REACHED.. exiting");
-                            //talker("END REACHED.. exiting @    " + (new Date()).toString(), masterAddress, masterJobPort);
-                            long t2 = System.currentTimeMillis();
-                            wr1.write(String.valueOf((t2 - t1)));
-                            wr1.newLine();
-                            wr1.write("success exit");
-                            wr1.newLine();
-                            wr1.write((new Date()).toString());
-                            wr1.close();
-                            break;
-
-                        } else {
-                            System.out.println("bundle | incoming: " + incoming);
-                            command = incoming.split(";");
-                            t3 = System.currentTimeMillis();
-                            wr1.write((new Date()).toString());
-                            proc = executeBashScript(command);
-                            wr1.newLine();
-                            wr1.write(incoming);
-                            wr1.newLine();
-                            t4 = System.currentTimeMillis();
-                            wr1.write(String.valueOf(t4 - t3));
-                            wr1.newLine();
-                            wr1.write((new Date()).toString());
-                            wr1.newLine();
-                            wr1.newLine();
-                            if (!proc.isEmpty()) {
-                                System.out.println("sending :" + "FAILURE @ " + incoming);
-                                wr1.write("Bundle, FAILED . exiting @    " + (new Date()).toString() + " on command " + incoming);
-                            } else {
-                                System.out.println("sending :" + "SUCCESS @ " + incoming);
-                                 wr1.write("Bundle, SUCCESS ).. exiting @    " + (new Date()).toString() + " on command " + incoming);
-                            }
-                           // wr1.close();
-                        }
-                    }
-
-                    break;
-                }           
-                
-                if (incoming.contains("terminate")) {
-                    System.out.println("END REACHED.. exiting");
-                    talker("END REACHED.. exiting @    " + (new Date()).toString(), masterAddress, masterJobPort);
-                    long t2 = System.currentTimeMillis();
-                    wr1.write(String.valueOf((t2 - t1)));
-                    wr1.newLine();
-                    wr1.write("success exit");
-                    wr1.newLine();
-                    wr1.write((new Date()).toString());
-                    wr1.close();
-                    break;
-                } else if (incoming.contains("timeout")) {
-                    System.out.println("server not sending... exiting");
-                    talker("server not sending... exiting", masterAddress, masterJobPort);
-                    long t2 = System.currentTimeMillis();
-                    wr1.write(String.valueOf((t2 - t1)));
-                    wr1.newLine();
-                    wr1.write("timeout Exit");
-                    wr1.newLine();
-                    wr1.write((new Date()).toString());
-                    wr1.close();
-                    break;
-
-                }
-                if (incoming.contains(("tarUpload"))) {
-                    wr1.write("final write before uploading...");
-                    //wr1.flush();
-                    long t2 = System.currentTimeMillis();
-                    wr1.write(String.valueOf((t2 - t1)));
-                    wr1.newLine();
-                    wr1.write("success exit");
-                    wr1.newLine();
-                    wr1.write((new Date()).toString());
-                    wr1.close();
-                    System.out.println("incoming: " + incoming);
-                    //System.out.println("END REACHED.. exiting");
-
-                    command = incoming.split(";");
-                    proc = executeBashScript(command);
-                    if (!proc.isEmpty()) {
-                        System.out.println("sending :" + "FAILURE @ " + incoming);
-                        talker("FAILED END (with upload).. exiting @    " + (new Date()).toString(), masterAddress, masterJobPort);
-                    } else {
-                        System.out.println("sending :" + "SUCCESS @ " + incoming);
-                        talker("SUCCESS END on upload).. exiting @    " + (new Date()).toString(), masterAddress, masterJobPort);
-                    }
-                    
-                    break;
-                } else {
-                    System.out.println("incoming: " + incoming);
-                    command = incoming.split(";");
-                    t3 = System.currentTimeMillis();
-                    wr1.write((new Date()).toString());
-                    proc = executeBashScript(command);
-                    wr1.newLine();
-                    wr1.write(incoming);
-                    wr1.newLine();
-                    t4 = System.currentTimeMillis();
-                    wr1.write(String.valueOf(t4 - t3));
-                    wr1.newLine();
-                    wr1.write((new Date()).toString());
-                    wr1.newLine();
-                    wr1.newLine();
-                }
-                if (!proc.isEmpty()) {
-                    System.out.println("sending :" + "FAILURE @ " + incoming);
-                    talker("FAILURE @ " + incoming + "  " + proc, masterAddress, masterJobPort);
-                } else {
-                    System.out.println("sending :" + "SUCCESS @ " + incoming);
-                    talker("SUCCESS @ " + incoming, masterAddress, masterJobPort);
-                }
+                wr1.newLine();
             }
-
+            if (!proc.isEmpty()) {
+                System.out.println("sending :" + "FAILURE @ " + incoming);
+                talker("FAILURE @ " + incoming + "  " + proc, masterAddress, masterJobPort);
+            } else {
+                System.out.println("sending :" + "SUCCESS @ " + incoming);
+                talker("SUCCESS @ " + incoming, masterAddress, masterJobPort);
+            }
         }
-        //wr1.close();
 
     }
+    //wr1.close();
 
 }
+
+//}
+//while (true) {
+//            incoming = waitForCommand();
+//            if (logic == 0) {
+//                logic = 1;
+//                wr1.write(incoming);
+//                wr1.newLine();
+//                wr1.write((new Date()).toString());
+//                wr1.newLine();
+//                System.out.println("Initializing with parameters: "+incoming);
+//                talker("Initialized @    " + (new Date()).toString()+" with parameters "+incoming, masterAddress, masterJobPort);
+//                t1 = System.currentTimeMillis();
+//            } else {
+//                if (incoming.contains("!")) {
+//                    talker("Bundle received"+incoming+".. exiting communications @    " + (new Date()).toString(), masterAddress, masterJobPort);
+//                    String[] bundle = incoming.split("!");
+//                    System.out.println("all INCOMING::::: "+incoming);
+//                    //TimeUnit.SECONDS.sleep(50);
+//                    for (int b = 0; b < bundle.length; b++) {
+//                        
+//                        incoming = bundle[b];
+//                        System.out.println("1 COMMAND :"+incoming);
+//                        //TimeUnit.SECONDS.sleep(50);
+//                        if (incoming.contains(("tarUpload"))) {
+//                            wr1.write("final write before uploading...");
+//                            //wr1.flush();
+//                            long t2 = System.currentTimeMillis();
+//                            wr1.write(String.valueOf((t2 - t1)));
+//                            wr1.newLine();
+//                            wr1.write("success exit");
+//                            wr1.newLine();
+//                            wr1.write((new Date()).toString());
+//                            wr1.close();
+//                            System.out.println("bundle| incoming: " + incoming);
+//                            //System.out.println("END REACHED.. exiting");
+//
+//                            command = incoming.split(";");
+//                            proc = executeBashScript(command);
+//                            if (!proc.isEmpty()) {
+//                                System.out.println("sending :" + "FAILURE @ " + incoming);
+//                                //wr1.write("Bundle| FAILED END (with upload).. exiting @    " + (new Date()).toString());
+//                            } else {
+//                                System.out.println("sending :" + "SUCCESS @ " + incoming);
+//                                 //wr1.write("Bundle| SUCCESS END on upload).. exiting @    " + (new Date()).toString());
+//                            }
+//                            //wr1.close();
+//                            break;
+//                        } else if (incoming.contains("terminate")) {
+//                            System.out.println("Bundle| END REACHED.. exiting");
+//                            //talker("END REACHED.. exiting @    " + (new Date()).toString(), masterAddress, masterJobPort);
+//                            long t2 = System.currentTimeMillis();
+//                            wr1.write(String.valueOf((t2 - t1)));
+//                            wr1.newLine();
+//                            wr1.write("success exit");
+//                            wr1.newLine();
+//                            wr1.write((new Date()).toString());
+//                            wr1.close();
+//                            break;
+//
+//                        } else {
+//                            System.out.println("bundle | incoming: " + incoming);
+//                            command = incoming.split(";");
+//                            t3 = System.currentTimeMillis();
+//                            wr1.write((new Date()).toString());
+//                            proc = executeBashScript(command);
+//                            wr1.newLine();
+//                            wr1.write(incoming);
+//                            wr1.newLine();
+//                            t4 = System.currentTimeMillis();
+//                            wr1.write(String.valueOf(t4 - t3));
+//                            wr1.newLine();
+//                            wr1.write((new Date()).toString());
+//                            wr1.newLine();
+//                            wr1.newLine();
+//                            if (!proc.isEmpty()) {
+//                                System.out.println("sending :" + "FAILURE @ " + incoming);
+//                                wr1.write("Bundle, FAILED . exiting @    " + (new Date()).toString() + " on command " + incoming);
+//                            } else {
+//                                System.out.println("sending :" + "SUCCESS @ " + incoming);
+//                                 wr1.write("Bundle, SUCCESS ).. exiting @    " + (new Date()).toString() + " on command " + incoming);
+//                            }
+//                           // wr1.close();
+//                        }
+//                    }
+//
+//                    break;
+//                }           
+//                
+//                if (incoming.contains("terminate")) {
+//                    System.out.println("END REACHED.. exiting");
+//                    talker("END REACHED.. exiting @    " + (new Date()).toString(), masterAddress, masterJobPort);
+//                    long t2 = System.currentTimeMillis();
+//                    wr1.write(String.valueOf((t2 - t1)));
+//                    wr1.newLine();
+//                    wr1.write("success exit");
+//                    wr1.newLine();
+//                    wr1.write((new Date()).toString());
+//                    wr1.close();
+//                    break;
+//                } else if (incoming.contains("timeout")) {
+//                    System.out.println("server not sending... exiting");
+//                    talker("server not sending... exiting", masterAddress, masterJobPort);
+//                    long t2 = System.currentTimeMillis();
+//                    wr1.write(String.valueOf((t2 - t1)));
+//                    wr1.newLine();
+//                    wr1.write("timeout Exit");
+//                    wr1.newLine();
+//                    wr1.write((new Date()).toString());
+//                    wr1.close();
+//                    break;
+//
+//                }
+//                if (incoming.contains(("tarUpload"))) {
+//                    wr1.write("final write before uploading...");
+//                    //wr1.flush();
+//                    long t2 = System.currentTimeMillis();
+//                    wr1.write(String.valueOf((t2 - t1)));
+//                    wr1.newLine();
+//                    wr1.write("success exit");
+//                    wr1.newLine();
+//                    wr1.write((new Date()).toString());
+//                    wr1.close();
+//                    System.out.println("incoming: " + incoming);
+//                    //System.out.println("END REACHED.. exiting");
+//
+//                    command = incoming.split(";");
+//                    proc = executeBashScript(command);
+//                    if (!proc.isEmpty()) {
+//                        System.out.println("sending :" + "FAILURE @ " + incoming);
+//                        talker("FAILED END (with upload).. exiting @    " + (new Date()).toString(), masterAddress, masterJobPort);
+//                    } else {
+//                        System.out.println("sending :" + "SUCCESS @ " + incoming);
+//                        talker("SUCCESS END on upload).. exiting @    " + (new Date()).toString(), masterAddress, masterJobPort);
+//                    }
+//                    
+//                    break;
+//                } else {
+//                    System.out.println("incoming: " + incoming);
+//                    command = incoming.split(";");
+//                    t3 = System.currentTimeMillis();
+//                    wr1.write((new Date()).toString());
+//                    proc = executeBashScript(command);
+//                    wr1.newLine();
+//                    wr1.write(incoming);
+//                    wr1.newLine();
+//                    t4 = System.currentTimeMillis();
+//                    wr1.write(String.valueOf(t4 - t3));
+//                    wr1.newLine();
+//                    wr1.write((new Date()).toString());
+//                    wr1.newLine();
+//                    wr1.newLine();
+//                }
+//                if (!proc.isEmpty()) {
+//                    System.out.println("sending :" + "FAILURE @ " + incoming);
+//                    talker("FAILURE @ " + incoming + "  " + proc, masterAddress, masterJobPort);
+//                } else {
+//                    System.out.println("sending :" + "SUCCESS @ " + incoming);
+//                    talker("SUCCESS @ " + incoming, masterAddress, masterJobPort);
+//                }
+//            }
+//
+//        }
